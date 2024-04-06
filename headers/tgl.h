@@ -79,7 +79,8 @@ typedef struct tgl__canvas {
     tgl__term_pixel_t *pixels;
 } tgl__canvas_t;
 
-TGLDEF TGL_MAYBE_UNUSED tgl__canvas_t tgl__make_canvas(tgl__term_pixel_t *pixels, int64_t width, int64_t height);
+TGLDEF TGL_MAYBE_UNUSED tgl__canvas_t
+tgl__make_canvas(tgl__term_pixel_t *pixels, int64_t width, int64_t height, tgl__term_pixel_t pixel);
 
 TGLDEF TGL_MAYBE_UNUSED void tgl__move_cursor(int64_t x, int64_t y);
 
@@ -105,7 +106,16 @@ TGLDEF TGL_MAYBE_UNUSED void tgl__fill_canvas(tgl__canvas_t canvas, tgl__term_pi
 
 TGLDEF TGL_MAYBE_UNUSED void tgl__draw(tgl__canvas_t canvas);
 
+TGLDEF TGL_MAYBE_UNUSED void
+tgl__draw_rect(tgl__canvas_t canvas, int64_t x, int64_t y, int64_t w, int64_t h, tgl__term_pixel_t pixel);
 
+TGLDEF TGL_MAYBE_UNUSED void
+tgl__draw_line(tgl__canvas_t canvas, int64_t x1, int64_t y1, int64_t x2, int64_t y2, tgl__term_pixel_t pixel);
+
+TGLDEF TGL_MAYBE_UNUSED bool tgl__is_inbounds(tgl__canvas_t canvas, int64_t x, int64_t y);
+
+TGLDEF TGL_MAYBE_UNUSED void
+tgl__draw_ellipse(tgl__canvas_t canvas, int64_t x, int64_t y, int64_t r1, int64_t r2, tgl__term_pixel_t pixel);
 
 // CPP EXTERN END ----------------------------------------------------------------------
 
@@ -224,13 +234,16 @@ TGLDEF TGL_MAYBE_UNUSED void tgl__move_cursor(int64_t x, int64_t y) {
     printf(ESC "[%lu;%luH", x, y);
 }
 
-TGLDEF TGL_MAYBE_UNUSED tgl__canvas_t tgl__make_canvas(tgl__term_pixel_t *pixels, int64_t width, int64_t height) {
+TGLDEF TGL_MAYBE_UNUSED tgl__canvas_t
+tgl__make_canvas(tgl__term_pixel_t *pixels, int64_t width, int64_t height, tgl__term_pixel_t pixel) {
     tgl__canvas_t canvas = {
             .pixels=pixels,
             .width=width,
             .height=height,
             .stride=width
     };
+
+    tgl__fill_canvas(canvas, pixel);
 
     return canvas;
 }
@@ -302,8 +315,139 @@ TGLDEF TGL_MAYBE_UNUSED void tgl__draw(tgl__canvas_t canvas) {
         putchar(pixel.value);
     }
     fputs(ESC"[0m", stdout);
+    fflush(stdout);
 }
 
+TGLDEF TGL_MAYBE_UNUSED void
+tgl__draw_rect(tgl__canvas_t canvas, int64_t x, int64_t y, int64_t w, int64_t h, tgl__term_pixel_t pixel) {
+    int64_t x1, x2, y1, y2;
+
+    if (!tgl__normalize_rect(x, y, w, h, canvas.width, canvas.height, &x1, &x2, &y1, &y2))
+        return;
+
+    for (int64_t ix = x1; ix <= x2; ix++) {
+        for (int64_t iy = y1; iy <= y2; iy++) {
+            TGL__GET_PIXEL(canvas, ix, iy) = pixel;
+        }
+    }
+}
+
+TGLDEF TGL_MAYBE_UNUSED void
+tgl__draw_line(tgl__canvas_t canvas, int64_t x1, int64_t y1, int64_t x2, int64_t y2, tgl__term_pixel_t pixel) {
+    int64_t dx = x2 - x1;
+    int64_t dy = y2 - y1;
+
+    if (dx == 0 && dy == 0) {
+        if (tgl__is_inbounds(canvas, x1, y1)) {
+            TGL__GET_PIXEL(canvas, x1, y1) = pixel;
+        }
+        return;
+    }
+
+    if (TGL__ABS(int64_t, dx) > TGL__ABS(int64_t, dy)) {
+        if (x1 > x2) {
+            TGL__SWAP(int64_t, x1, x2);
+            TGL__SWAP(int64_t, y1, y2);
+        }
+
+        for (int64_t x = x1; x <= x2; x++) {
+            int64_t y = dy * (x - x1) / dx + y1;
+            if (tgl__is_inbounds(canvas, x, y)) {
+                TGL__GET_PIXEL(canvas, x, y) = pixel;
+            }
+        }
+    } else {
+        if (y1 > y2) {
+            TGL__SWAP(int64_t, x1, x2);
+            TGL__SWAP(int64_t, y1, y2);
+        }
+
+        for (int64_t y = y1; y <= y2; ++y) {
+            int64_t x = dx * (y - y1) / dy + x1;
+            if (tgl__is_inbounds(canvas, x, y)) {
+                TGL__GET_PIXEL(canvas, x, y) = pixel;
+            }
+        }
+    }
+}
+
+
+TGLDEF TGL_MAYBE_UNUSED bool tgl__is_inbounds(tgl__canvas_t canvas, int64_t x, int64_t y) {
+    return 0 <= x && x < (int64_t) canvas.width && 0 <= y && y < (int64_t) canvas.height;
+}
+
+TGLDEF TGL_MAYBE_UNUSED void
+tgl__draw_ellipse(tgl__canvas_t canvas, int64_t x, int64_t y, int64_t r1, int64_t r2, tgl__term_pixel_t pixel) {
+    int64_t wx, wy;
+    int64_t thresh;
+    int64_t asq = r1 * r1; // TODO: OVERFLOW CHECK
+    int64_t bsq = r2 * r2;
+    int64_t xa, ya;
+    int64_t ix = x, iy = y;
+    int64_t ir1 = r1, ir2 = r2;
+
+    TGL__GET_PIXEL(canvas, ix, y + r2) = pixel;
+    TGL__GET_PIXEL(canvas, ix, y - r2) = pixel;
+
+    wx = 0;
+    wy = ir2;
+    xa = 0;
+    ya = asq * 2 * r2;
+    thresh = asq / 4 - asq * r2;
+
+    for (;;) {
+        thresh += xa + bsq;
+
+        if (thresh >= 0) {
+            ya -= asq * 2;
+            thresh -= ya;
+            wy--;
+        }
+
+        xa += bsq * 2;
+        wx++;
+
+        if (xa >= ya)
+            break;
+
+
+        TGL__GET_PIXEL(canvas, ix + wx, iy - wy) = pixel;
+        TGL__GET_PIXEL(canvas, ix - wx, iy - wy) = pixel;
+        TGL__GET_PIXEL(canvas, ix + wx, iy + wy) = pixel;
+        TGL__GET_PIXEL(canvas, ix - wx, iy + wy) = pixel;
+    }
+
+    TGL__GET_PIXEL(canvas, (x + r1), iy) = pixel;
+    TGL__GET_PIXEL(canvas, (x - r1), iy) = pixel;
+
+    wx = ir1;
+    wy = 0;
+    xa = (bsq) * 2 * r1;
+
+    ya = 0;
+    thresh = bsq / 4 - bsq * r1;
+
+    for (;;) {
+        thresh += ya + asq;
+
+        if (thresh >= 0) {
+            xa -= bsq * 2;
+            thresh = thresh - xa;
+            wx--;
+        }
+
+        ya += asq * 2;
+        wy++;
+
+        if (ya > xa)
+            break;
+
+        TGL__GET_PIXEL(canvas, ix + wx, iy - wy) = pixel;
+        TGL__GET_PIXEL(canvas, ix - wx, iy - wy) = pixel;
+        TGL__GET_PIXEL(canvas, ix + wx, iy + wy) = pixel;
+        TGL__GET_PIXEL(canvas, ix - wx, iy + wy) = pixel;
+    }
+}
 
 #endif
 
