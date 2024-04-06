@@ -1,10 +1,13 @@
+// HEADER GUARD ------------------------------------------------------------------------
 #ifndef TGL_LIB_H_
 #define TGL_LIB_H_
 
+// CPP EXTERN START --------------------------------------------------------------------
 #ifdef __cplusplus
 extern "C" {
 #endif
 
+// INTERNAL TGL MACROS -----------------------------------------------------------------
 #ifndef TGLDEF
 #define TGLDEF static inline
 #endif
@@ -16,7 +19,7 @@ extern "C" {
 #define TGL_MAYBE_UNUSED
 #endif
 
-// Platform-specific includes and definitions
+// Platform-specific includes and definitions ------------------------------------------
 #if defined(__unix__) || defined(__unix) || defined(__linux) || \
     defined(__linux__)
 
@@ -36,6 +39,7 @@ extern "C" {
 
 #endif
 
+// INCLUDES ----------------------------------------------------------------------------
 #include <stddef.h>
 #include <stdint.h>
 #include <stdio.h>
@@ -43,27 +47,41 @@ extern "C" {
 #include <string.h>
 #include <uchar.h>
 
-
 #if !defined(__cplusplus) && __STDC_VERSION__ <= 201710L
 #include <stdbool.h>
 #endif
 
-typedef struct {
-    uint16_t width;
-    uint16_t height;
+// EXTERNAL TGL MACROS -----------------------------------------------------------------
+#define TGL__NULL_CANVAS ((tgl__canvas_t) {0})
+#define TGL__GET_PIXEL(canvas, x, y) (canvas).pixels[(y)*(canvas).stride + (x)]
+#define TGL__SWAP(T, a, b) {T t = a; a = b; b = t;}
+#define TGL__SIGN(T, x) ((T)((x) > 0) - (T)((x) < 0))
+#define TGL__ABS(T, x) (TGL__SIGN(T, x)*(x))
+
+
+// DEFINITIONS -------------------------------------------------------------------------
+
+typedef struct tgl__term_dim {
+    int64_t width;
+    int64_t height;
 } tgl__term_dim_t;
 
-typedef struct {
-    char8_t foreground_color;
-    char8_t background_color;
-    char8_t value;
+typedef struct tgl__term_pixel {
+    char value;
+    char *foreground_color;
+    char *background_color;
 } tgl__term_pixel_t;
 
-typedef struct {
-    uint16_t width;
-    uint16_t height;
-    tgl__term_pixel_t *arr;
+typedef struct tgl__canvas {
+    int64_t width;
+    int64_t height;
+    int64_t stride;
+    tgl__term_pixel_t *pixels;
 } tgl__canvas_t;
+
+TGLDEF TGL_MAYBE_UNUSED tgl__canvas_t tgl__make_canvas(tgl__term_pixel_t *pixels, int64_t width, int64_t height);
+
+TGLDEF TGL_MAYBE_UNUSED void tgl__move_cursor(int64_t x, int64_t y);
 
 TGLDEF TGL_MAYBE_UNUSED bool tgl__supports_color(void);
 
@@ -75,17 +93,27 @@ TGLDEF TGL_MAYBE_UNUSED void tgl__show_cursor(void);
 
 TGLDEF TGL_MAYBE_UNUSED tgl__term_dim_t tgl__get_term_size(void);
 
-TGLDEF TGL_MAYBE_UNUSED void tgl__move_cursor(uint16_t x, uint16_t y);
 
-TGLDEF TGL_MAYBE_UNUSED void tgl__draw_pixel(tgl__canvas_t *canvas, uint16_t x, uint16_t y, tgl__term_pixel_t pixel);
+TGLDEF TGL_MAYBE_UNUSED bool tgl__normalize_rect(int64_t x, int64_t y, int64_t w, int64_t h,
+                                                 int64_t canvas_width, int64_t canvas_height,
+                                                 int64_t *x1, int64_t *x2, int64_t *y1, int64_t *y2);
 
-TGLDEF TGL_MAYBE_UNUSED void
-tgl__draw_line(tgl__canvas_t *canvas, uint16_t x1, uint16_t y1, uint16_t x2, uint16_t y2, tgl__term_pixel_t pixel);
+TGLDEF TGL_MAYBE_UNUSED tgl__canvas_t
+tgl__make_subcanvas(tgl__canvas_t canvas, int64_t x, int64_t y, int64_t width, int64_t height);
+
+TGLDEF TGL_MAYBE_UNUSED void tgl__fill_canvas(tgl__canvas_t canvas, tgl__term_pixel_t pixel);
+
+TGLDEF TGL_MAYBE_UNUSED void tgl__draw(tgl__canvas_t canvas);
+
+
+
+// CPP EXTERN END ----------------------------------------------------------------------
 
 #ifdef __cplusplus
 }
 #endif
 
+// IMPLEMENTATION ----------------------------------------------------------------------
 #ifdef TGL_IMPLEMENTATION
 
 TGLDEF TGL_MAYBE_UNUSED bool tgl__supports_color(void) {
@@ -142,7 +170,7 @@ TGLDEF TGL_MAYBE_UNUSED void tgl__clear_terminal(void) {
 #endif
 }
 
-TGLDEF tgl__term_dim_t tgl__get_term_size(void) {
+TGLDEF TGL_MAYBE_UNUSED tgl__term_dim_t tgl__get_term_size(void) {
     tgl__term_dim_t term_size;
 #ifdef OS_LINUX
     struct winsize w = {};
@@ -192,12 +220,94 @@ TGLDEF TGL_MAYBE_UNUSED void tgl__show_cursor(void) {
 #endif
 }
 
-TGLDEF TGL_MAYBE_UNUSED void tgl__move_cursor(uint16_t x, uint16_t y) {
-    printf(ESC "[%hu;%huH", x, y);
+TGLDEF TGL_MAYBE_UNUSED void tgl__move_cursor(int64_t x, int64_t y) {
+    printf(ESC "[%lu;%luH", x, y);
 }
+
+TGLDEF TGL_MAYBE_UNUSED tgl__canvas_t tgl__make_canvas(tgl__term_pixel_t *pixels, int64_t width, int64_t height) {
+    tgl__canvas_t canvas = {
+            .pixels=pixels,
+            .width=width,
+            .height=height,
+            .stride=width
+    };
+
+    return canvas;
+}
+
+TGLDEF TGL_MAYBE_UNUSED bool tgl__normalize_rect(int64_t x, int64_t y, int64_t w, int64_t h,
+                                                 int64_t canvas_width, int64_t canvas_height,
+                                                 int64_t *x1, int64_t *x2, int64_t *y1, int64_t *y2) {
+    *x1 = x;
+    *y1 = y;
+
+    // Convert the rectangle to 2-points representation
+    *x2 = *x1 + TGL__SIGN(int64_t, w) * (TGL__ABS(int64_t, w) - 1);
+    if (*x1 > *x2) TGL__SWAP(int64_t, *x1, *x2);
+    *y2 = *y1 + TGL__SIGN(int64_t, h) * (TGL__ABS(int64_t, h) - 1);
+    if (*y1 > *y2) TGL__SWAP(int64_t, *y1, *y2);
+
+    // Cull out invisible rectangle
+    if (*x1 >= canvas_width) return false;
+    if (*x2 < 0) return false;
+    if (*y1 >= canvas_height) return false;
+    if (*y2 < 0) return false;
+
+    // Clamp the rectangle to the boundaries
+    if (*x1 < 0) *x1 = 0;
+    if (*x2 >= canvas_width) *x2 = canvas_width - 1;
+    if (*y1 < 0) *y1 = 0;
+    if (*y2 >= canvas_height) *y2 = canvas_height - 1;
+
+    return true;
+}
+
+
+TGLDEF TGL_MAYBE_UNUSED tgl__canvas_t
+tgl__make_subcanvas(tgl__canvas_t canvas, int64_t x, int64_t y, int64_t width, int64_t height) {
+    int64_t x1, x2, y1, y2;
+    if (!tgl__normalize_rect(x, y, width, height, canvas.width, canvas.height, &x1, &x2, &y1, &y2))
+        return TGL__NULL_CANVAS;
+    canvas.pixels = &TGL__GET_PIXEL(canvas, x1, y1);
+    canvas.width = x2 - x1 + 1;
+    canvas.height = y2 - y1 + 1;
+    return canvas;
+}
+
+TGLDEF TGL_MAYBE_UNUSED void tgl__fill_canvas(tgl__canvas_t canvas, tgl__term_pixel_t pixel) {
+    for (int64_t y = 0; y < canvas.height; y++) {
+        for (int64_t x = 0; x < canvas.width; x++) {
+            TGL__GET_PIXEL(canvas, x, y) = pixel;
+        }
+    }
+}
+
+TGLDEF TGL_MAYBE_UNUSED void tgl__draw(tgl__canvas_t canvas) {
+    tgl__move_cursor(0, 0);
+    int64_t y = 0;
+    for (; y < canvas.height - 1; y++) {
+        for (int64_t x = 0; x < canvas.width; x++) {
+            tgl__term_pixel_t pixel = TGL__GET_PIXEL(canvas, x, y);
+            fputs(pixel.background_color, stdout);
+            fputs(pixel.foreground_color, stdout);
+            putchar(pixel.value);
+        }
+        fputs("\n", stdout);
+    }
+
+    for (int64_t x = 0; x < canvas.width; x++) {
+        tgl__term_pixel_t pixel = TGL__GET_PIXEL(canvas, x, y);
+        fputs(pixel.background_color, stdout);
+        fputs(pixel.foreground_color, stdout);
+        putchar(pixel.value);
+    }
+    fputs(ESC"[0m", stdout);
+}
+
 
 #endif
 
+// UNDEF INTERNAL MACROS ---------------------------------------------------------------
 #undef OS_LINUX
 #undef OS_WINDOWS
 #undef TGLDEF
