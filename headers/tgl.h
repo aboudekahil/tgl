@@ -19,6 +19,7 @@ extern "C" {
 #define TGL_MAYBE_UNUSED
 #endif
 
+
 // Platform-specific includes and definitions ------------------------------------------
 #if defined(__unix__) || defined(__unix) || defined(__linux) || \
     defined(__linux__)
@@ -57,9 +58,30 @@ extern "C" {
 #define TGL__SWAP(T, a, b) {T t = a; a = b; b = t;}
 #define TGL__SIGN(T, x) ((T)((x) > 0) - (T)((x) < 0))
 #define TGL__ABS(T, x) (TGL__SIGN(T, x)*(x))
+#define TGL__IN_BOUNDS(canvas, x, y) x >= 0 && x < canvas.width && y >= 0 && y < canvas.height
 
 
 // DEFINITIONS -------------------------------------------------------------------------
+
+typedef union tgl__color {
+#if __BYTE_ORDER__ == __ORDER_BIG_ENDIAN__
+    struct
+    {
+        uint8_t   blue;
+        uint8_t   green;
+        uint8_t   red;
+        uint8_t   alpha;
+    };
+#else
+    struct {
+        uint8_t a;
+        uint8_t r;
+        uint8_t g;
+        uint8_t b;
+    };
+#endif
+    uint32_t value;
+} tgl__color_t;
 
 typedef struct tgl__term_dim {
     int64_t width;
@@ -68,8 +90,8 @@ typedef struct tgl__term_dim {
 
 typedef struct tgl__term_pixel {
     char value;
-    char *foreground_color;
-    char *background_color;
+    tgl__color_t foreground_color;
+    tgl__color_t background_color;
 } tgl__term_pixel_t;
 
 typedef struct tgl__canvas {
@@ -106,8 +128,6 @@ TGLDEF TGL_MAYBE_UNUSED void tgl__fill_canvas(tgl__canvas_t canvas, tgl__term_pi
 
 TGLDEF TGL_MAYBE_UNUSED void tgl__draw(tgl__canvas_t canvas);
 
-TGLDEF TGL_MAYBE_UNUSED void
-tgl__draw_rect(tgl__canvas_t canvas, int64_t x, int64_t y, int64_t w, int64_t h, tgl__term_pixel_t pixel);
 
 TGLDEF TGL_MAYBE_UNUSED void
 tgl__draw_line(tgl__canvas_t canvas, int64_t x1, int64_t y1, int64_t x2, int64_t y2, tgl__term_pixel_t pixel);
@@ -115,7 +135,17 @@ tgl__draw_line(tgl__canvas_t canvas, int64_t x1, int64_t y1, int64_t x2, int64_t
 TGLDEF TGL_MAYBE_UNUSED bool tgl__is_inbounds(tgl__canvas_t canvas, int64_t x, int64_t y);
 
 TGLDEF TGL_MAYBE_UNUSED void
+tgl__draw_rect(tgl__canvas_t canvas, int64_t x, int64_t y, int64_t w, int64_t h, tgl__term_pixel_t pixel);
+
+TGLDEF TGL_MAYBE_UNUSED void
 tgl__draw_ellipse(tgl__canvas_t canvas, int64_t x, int64_t y, int64_t r1, int64_t r2, tgl__term_pixel_t pixel);
+
+TGLDEF TGL_MAYBE_UNUSED void
+tgl__fill_rect(tgl__canvas_t canvas, int64_t x, int64_t y, int64_t w, int64_t h, tgl__term_pixel_t pixel);
+
+TGLDEF TGL_MAYBE_UNUSED void
+tgl__fill_ellipse(tgl__canvas_t canvas, int64_t x, int64_t y, int64_t r1, int64_t r2, tgl__term_pixel_t pixel);
+
 
 // CPP EXTERN END ----------------------------------------------------------------------
 
@@ -301,8 +331,8 @@ TGLDEF TGL_MAYBE_UNUSED void tgl__draw(tgl__canvas_t canvas) {
     for (; y < canvas.height - 1; y++) {
         for (int64_t x = 0; x < canvas.width; x++) {
             tgl__term_pixel_t pixel = TGL__GET_PIXEL(canvas, x, y);
-            fputs(pixel.background_color, stdout);
-            fputs(pixel.foreground_color, stdout);
+            printf(ESC"[48;2;%d;%d;%dm", pixel.background_color.r, pixel.background_color.g, pixel.background_color.b);
+            printf(ESC"[38;2;%d;%d;%dm", pixel.foreground_color.r, pixel.foreground_color.g, pixel.foreground_color.b);
             putchar(pixel.value);
         }
         fputs("\n", stdout);
@@ -310,8 +340,8 @@ TGLDEF TGL_MAYBE_UNUSED void tgl__draw(tgl__canvas_t canvas) {
 
     for (int64_t x = 0; x < canvas.width; x++) {
         tgl__term_pixel_t pixel = TGL__GET_PIXEL(canvas, x, y);
-        fputs(pixel.background_color, stdout);
-        fputs(pixel.foreground_color, stdout);
+        printf(ESC"[48;2;%d;%d;%dm", pixel.background_color.r, pixel.background_color.g, pixel.background_color.b);
+        printf(ESC"[38;2;%d;%d;%dm", pixel.foreground_color.r, pixel.foreground_color.g, pixel.foreground_color.b);
         putchar(pixel.value);
     }
     fputs(ESC"[0m", stdout);
@@ -319,7 +349,7 @@ TGLDEF TGL_MAYBE_UNUSED void tgl__draw(tgl__canvas_t canvas) {
 }
 
 TGLDEF TGL_MAYBE_UNUSED void
-tgl__draw_rect(tgl__canvas_t canvas, int64_t x, int64_t y, int64_t w, int64_t h, tgl__term_pixel_t pixel) {
+tgl__fill_rect(tgl__canvas_t canvas, int64_t x, int64_t y, int64_t w, int64_t h, tgl__term_pixel_t pixel) {
     int64_t x1, x2, y1, y2;
 
     if (!tgl__normalize_rect(x, y, w, h, canvas.width, canvas.height, &x1, &x2, &y1, &y2))
@@ -449,6 +479,71 @@ tgl__draw_ellipse(tgl__canvas_t canvas, int64_t x, int64_t y, int64_t r1, int64_
     }
 }
 
+TGLDEF TGL_MAYBE_UNUSED void
+tgl__draw_rect(tgl__canvas_t canvas, int64_t x, int64_t y, int64_t w, int64_t h, tgl__term_pixel_t pixel) {
+    int64_t x1, x2, y1, y2;
+
+    if (!tgl__normalize_rect(x, y, w, h, canvas.width, canvas.height, &x1, &x2, &y1, &y2))
+        return;
+
+    for (int64_t i = x1; i <= x2; i++) {
+        TGL__GET_PIXEL(canvas, i, y1) = pixel;
+    }
+
+    for (int64_t i = x1; i <= x2; i++) {
+        TGL__GET_PIXEL(canvas, i, y2) = pixel;
+    }
+
+    for (int64_t i = y1; i <= y2; i++) {
+        TGL__GET_PIXEL(canvas, x1, i) = pixel;
+    }
+
+    for (int64_t i = y1; i <= y2; i++) {
+        TGL__GET_PIXEL(canvas, x2, i) = pixel;
+    }
+}
+
+TGLDEF TGL_MAYBE_UNUSED void
+tgl__fill_ellipse(tgl__canvas_t canvas, int64_t x, int64_t y, int64_t r1, int64_t r2, tgl__term_pixel_t pixel) {
+    int64_t x1 = x - r1, x2 = x + r1, y1 = y - r2, y2 = y + r2;
+
+    if (x1 > canvas.width || y1 > canvas.height || x2 < 0 || y2 < 0) return;
+
+    int64_t width = x2 - x1;
+    int64_t height = y2 - y1;
+
+    int64_t hh = height * height;
+    int64_t ww = width * width;
+    int64_t hhww = hh * ww;
+    int64_t x0 = width;
+    int64_t dx = 0;
+
+    // do the horizontal diameter
+    for (int64_t ix = -width; ix <= width; ix++) {
+        if (TGL__IN_BOUNDS(canvas, x + ix, y)) {
+            TGL__GET_PIXEL(canvas, x + ix, y) = pixel;
+        }
+    }
+
+    // now do both halves at the same time, away from the diameter
+    for (int64_t iy = 1; iy <= height; iy++) {
+        int64_t sx1 = x0 - (dx - 1);  // try slopes of dx - 1 or more
+        for (; sx1 > 0; sx1--) {
+            if (sx1 * sx1 * hh + iy * iy * ww <= hhww) {
+                break;
+            }
+        }
+        dx = x0 - sx1;  // current approximation of the slope
+        x0 = sx1;
+
+        for (int64_t ix = -x0; ix <= x0; ix++) {
+            // TODO: REFACTOR TO GET x + ix not checked twice
+            if (TGL__IN_BOUNDS(canvas, x + ix, y - iy)) TGL__GET_PIXEL(canvas, x + ix, y - iy) = pixel;
+            if (TGL__IN_BOUNDS(canvas, x + ix, y - iy)) TGL__GET_PIXEL(canvas, x + ix, y + iy) = pixel;
+        }
+    }
+}
+
 #endif
 
 // UNDEF INTERNAL MACROS ---------------------------------------------------------------
@@ -458,3 +553,6 @@ tgl__draw_ellipse(tgl__canvas_t canvas, int64_t x, int64_t y, int64_t r1, int64_
 #undef ESC
 
 #endif
+
+// TODO: add 3d rendering
+// TODO: add text rendering
