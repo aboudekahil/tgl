@@ -61,23 +61,23 @@ extern "C" {
 #define TGL__IN_BOUNDS(canvas, x, y) x >= 0 && x < canvas.width && y >= 0 && y < canvas.height
 
 
+
 // DEFINITIONS -------------------------------------------------------------------------
 
 typedef union tgl__color {
 #if __BYTE_ORDER__ == __ORDER_BIG_ENDIAN__
-    struct
-    {
-        uint8_t   blue;
-        uint8_t   green;
-        uint8_t   red;
-        uint8_t   alpha;
-    };
-#else
     struct {
         uint8_t a;
         uint8_t r;
         uint8_t g;
         uint8_t b;
+    };
+#else
+    struct {
+        uint8_t b;
+        uint8_t g;
+        uint8_t r;
+        uint8_t a;
     };
 #endif
     uint32_t value;
@@ -539,7 +539,7 @@ tgl__fill_ellipse(tgl__canvas_t canvas, int64_t x, int64_t y, int64_t r1, int64_
         for (int64_t ix = -x0; ix <= x0; ix++) {
             // TODO: REFACTOR TO GET x + ix not checked twice
             if (TGL__IN_BOUNDS(canvas, x + ix, y - iy)) TGL__GET_PIXEL(canvas, x + ix, y - iy) = pixel;
-            if (TGL__IN_BOUNDS(canvas, x + ix, y - iy)) TGL__GET_PIXEL(canvas, x + ix, y + iy) = pixel;
+            if (TGL__IN_BOUNDS(canvas, x + ix, y + iy)) TGL__GET_PIXEL(canvas, x + ix, y + iy) = pixel;
         }
     }
 }
