@@ -9,7 +9,6 @@
 #define GRID_PAD (0.5/GRID_COUNT)
 #define GRID_SIZE ((GRID_COUNT - 1)*GRID_PAD)
 #define CIRCLE_RADIUS 2
-#define Z_START 0.25
 #define DS 1.f/60.f
 
 
