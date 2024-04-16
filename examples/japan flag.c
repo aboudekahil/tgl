@@ -1,3 +1,4 @@
+#define TGL_IMPLEMENTATION
 #include "../headers/tgl.h"
 
 #define WIDTH 400
