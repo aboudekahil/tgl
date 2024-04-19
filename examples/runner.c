@@ -2,13 +2,13 @@
 
 #include <signal.h>
 #include <time.h>
-#include "./headers/tgl.h"
+#include "../headers/tgl.h"
 
 void setup(tglCanvas canvas);
 void render(tglCanvas canvas);
 void update(float dt, bool* isRunning);
 
-#include "./examples/japan flag.c"
+#include "dots.c"
 
 #ifndef WIDTH
 #define WIDTH 0
