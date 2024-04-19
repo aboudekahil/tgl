@@ -8,25 +8,20 @@
 #define WIDTH 400
 #define HEIGHT 100
 
-static tglTermPixel pixels[WIDTH * HEIGHT];
+static int i = 0;
 
-int main() {
-    tglClearTerminal();
-    tglHideCursor();
-    tglCanvas canvas = tglMakeCanvas(pixels, WIDTH, HEIGHT, BACKGROUND_PIXEL);
+void setup(tglCanvas canvas) {}
 
-    int i = 0;
-    while (i++ < 100000) {
-        tglFillCanvas(canvas, BACKGROUND_PIXEL);
+void render(tglCanvas canvas) {
+    tglFillCanvas(canvas, BACKGROUND_PIXEL);
 
-        tglFillRect(canvas, 0, 0, WIDTH, HEIGHT, WHITE);
-        tglFillEllipse(canvas, WIDTH/2, HEIGHT/2, HEIGHT / 3, HEIGHT / 6, RED);
+    tglFillRect(canvas, 0, 0, WIDTH, HEIGHT, WHITE);
+    tglFillEllipse(canvas, WIDTH/2, HEIGHT/2, HEIGHT / 3, HEIGHT / 6, RED);
 
-        tglRender(canvas);
-
-        usleep(100000 / 60);
-    }
-
-    tglShowCursor();
-    return EXIT_SUCCESS;
+    tglRender(canvas);
 }
+
+void update(float dt, bool* isRunning) {
+    if(i++ > 1000) *isRunning = false;
+}
+

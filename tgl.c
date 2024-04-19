@@ -1,49 +1,77 @@
-#include <math.h>
-#include <stdbool.h>
-
 #define TGL_IMPLEMENTATION
 
+#include <signal.h>
+#include <time.h>
 #include "./headers/tgl.h"
 
+void setup(tglCanvas canvas);
+void render(tglCanvas canvas);
+void update(float dt, bool* isRunning);
 
-#define WIDTH 200
-#define HEIGHT 100
-#define DEAD (tglTermPixel) {.value=' ',.foregroundColor={.value=0},.backgroundColor={.value=0}}
-#define ALIVE (tgl__term_pixel_t) {.value=' ',.foregroundColor={.value=0},.backgroundColor={.value=0xFFFFFFFF}}
+#include "./examples/japan flag.c"
 
-typedef bool(*rule_check_t)(bool **, size_t, size_t, size_t, size_t);
+#ifndef WIDTH
+#define WIDTH 0
+#endif
 
-static tglTermPixel pixels[WIDTH * HEIGHT];
+#ifndef HEIGHT
+#define HEIGHT 0
+#endif
 
+#define TARGET_FPS 60
+#define MS_PER_FRAME (1000 / TARGET_FPS)
 
-bool check_if_will_live(bool **grid, size_t width, size_t height, size_t i, size_t j, rule_check_t *rules);
+#ifndef BACKGROUND_PIXEL
+#define BACKGROUND_PIXEL (tglTermPixel) {.value=' ',.foregroundColor={.value=0},.backgroundColor={.value=0}}
+#endif
 
-void advance_grid(bool **grid, size_t width, size_t height);
-
-bool c1(bool **, size_t width, size_t height, size_t i, size_t j);
-
-static rule_check_t CHECKS[] = {c1};
-
-int main() {
-    tglClearTerminal();
-    tglHideCursor();
-
-    tglCanvas canvas = tglMakeCanvas(pixels, WIDTH, HEIGHT, DEAD);
-    int i = 0;
-    while (i++ < 1000000) {
-        tglFillCanvas(canvas, DEAD);
-
-        tglRender(canvas);
-        usleep(1000000 / 60);
-    }
-    tglShowCursor();
-    return EXIT_SUCCESS;
+uint64_t getCurrentTimeMillis() {
+    struct timespec ts;
+    clock_gettime(CLOCK_MONOTONIC, &ts);
+    return (unsigned long long) (ts.tv_sec) * 1000 + (unsigned long long) (ts.tv_nsec) / 1000000;
 }
 
-void advance_grid(bool **grid, size_t width, size_t height) {
-    for (size_t i = 0; i < height; ++i) {
-        for (size_t j = 0; j < width; ++j) {
-            grid[i][j] = check_if_will_live(grid, width, height, i, j, CHECKS);
+void intHandler(int _) {
+    tglShowCursor();
+    exit(_);
+}
+
+tglTermPixel PIXELS[WIDTH * HEIGHT];
+
+int main() {
+    tglCanvas canvas = tglMakeCanvas(PIXELS, WIDTH, HEIGHT, BACKGROUND_PIXEL);
+
+    tglClearTerminal();
+    tglHideCursor();
+    signal(SIGINT, intHandler);
+
+    bool isRunning = true;
+
+    uint64_t lastTime = getCurrentTimeMillis();
+    uint64_t currentTime;
+    float deltaTime;
+
+    setup(canvas);
+
+    while (isRunning) {
+        currentTime = getCurrentTimeMillis();
+        deltaTime = (float) (currentTime - lastTime) / 1000.0f;
+        lastTime = currentTime;
+
+        render(canvas);
+        update(deltaTime, &isRunning);
+
+        uint64_t frameTime = getCurrentTimeMillis() - currentTime;
+        if (frameTime < MS_PER_FRAME) {
+            // Sleep to maintain consistent frame rate
+            uint64_t sleepTime = MS_PER_FRAME - frameTime;
+            struct timespec req = {0};
+            req.tv_sec = sleepTime / 1000;
+            req.tv_nsec = (sleepTime % 1000) * 1000000;
+            nanosleep(&req, NULL);
         }
     }
+
+    tglShowCursor();
+    return EXIT_SUCCESS;
 }
