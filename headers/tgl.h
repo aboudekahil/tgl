@@ -101,8 +101,8 @@ typedef struct {
 
 typedef struct {
     char value;
-    tglColor foreground_color;
-    tglColor background_color;
+    tglColor foregroundColor;
+    tglColor backgroundColor;
 } tglTermPixel;
 
 typedef struct {
@@ -124,13 +124,13 @@ TGLDEF TGL_MAYBE_UNUSED void tglClearTerminal(void);
 
 TGLDEF TGL_MAYBE_UNUSED void tglHideCursor(void);
 
-TGLDEF TGL_MAYBE_UNUSED void tgl__show_cursor(void);
+TGLDEF TGL_MAYBE_UNUSED void tglShowCursor(void);
 
 TGLDEF TGL_MAYBE_UNUSED tglTermDim tglGetTermSize(void);
 
 
 TGLDEF TGL_MAYBE_UNUSED bool tglNormalizeRect(int64_t x, int64_t y, int64_t w, int64_t h,
-                                              int64_t canvas_width, int64_t canvas_height,
+                                              int64_t canvasWidth, int64_t canvasHeight,
                                               int64_t *x1, int64_t *x2, int64_t *y1, int64_t *y2);
 
 TGLDEF TGL_MAYBE_UNUSED tglCanvas
@@ -171,19 +171,19 @@ tglFillEllipse(tglCanvas canvas, int64_t x, int64_t y, int64_t r1, int64_t r2, t
 
 TGLDEF TGL_MAYBE_UNUSED bool tglSupportsColor(void) {
 #ifdef OS_LINUX
-    const char *supported_terms[] = {
+    const char *supportedTerms[] = {
             "ansi", "color", "console", "cygwin", "gnome", "konsole", "kterm",
             "linux", "msys", "putty", "rxvt", "screen", "vt100", "xterm"};
 
-    const char *env_p = getenv("TERM");
-    if (env_p == nullptr) {
+    const char *envP = getenv("TERM");
+    if (envP == nullptr) {
         return false;
     }
 
     for (uint8_t i = 0;
-         i < (uint8_t) (sizeof(supported_terms) / sizeof(supported_terms[0]));
+         i < (uint8_t) (sizeof(supportedTerms) / sizeof(supportedTerms[0]));
          i++) {
-        if (strstr(env_p, supported_terms[i]) != nullptr) {
+        if (strstr(envP, supportedTerms[i]) != nullptr) {
             return true;
         }
     }
@@ -224,21 +224,21 @@ TGLDEF TGL_MAYBE_UNUSED void tglClearTerminal(void) {
 }
 
 TGLDEF TGL_MAYBE_UNUSED tglTermDim tglGetTermSize(void) {
-    tglTermDim term_size;
+    tglTermDim termSize;
 #ifdef OS_LINUX
     struct winsize w = {};
     ioctl(STDOUT_FILENO, TIOCGWINSZ, &w);
-    term_size.width = w.ws_col;
-    term_size.height = w.ws_row;
+    termSize.width = w.ws_col;
+    termSize.height = w.ws_row;
 #elif defined(OS_WINDOWS)
     CONSOLE_SCREEN_BUFFER_INFO csbi;
     GetConsoleScreenBufferInfo(GetStdHandle(STD_OUTPUT_HANDLE), &csbi);
-    term_size.width = csbi.srWindow.Right - csbi.srWindow.Left + 1;
-    term_size.height = csbi.srWindow.Bottom - csbi.srWindow.Top + 1;
+    termSize.width = csbi.srWindow.Right - csbi.srWindow.Left + 1;
+    termSize.height = csbi.srWindow.Bottom - csbi.srWindow.Top + 1;
 
 #endif
 
-    return term_size;
+    return termSize;
 }
 
 TGLDEF TGL_MAYBE_UNUSED void tglHideCursor(void) {
@@ -257,7 +257,7 @@ TGLDEF TGL_MAYBE_UNUSED void tglHideCursor(void) {
 #endif
 }
 
-TGLDEF TGL_MAYBE_UNUSED void tgl__show_cursor(void) {
+TGLDEF TGL_MAYBE_UNUSED void tglShowCursor(void) {
 #ifdef OS_LINUX
     printf(ESC "[?25h");
 #elif defined(OS_WINDOWS)
@@ -292,7 +292,7 @@ tglMakeCanvas(tglTermPixel *pixels, int64_t width, int64_t height, tglTermPixel 
 }
 
 TGLDEF TGL_MAYBE_UNUSED bool tglNormalizeRect(int64_t x, int64_t y, int64_t w, int64_t h,
-                                              int64_t canvas_width, int64_t canvas_height,
+                                              int64_t canvasWidth, int64_t canvasHeight,
                                               int64_t *x1, int64_t *x2, int64_t *y1, int64_t *y2) {
     *x1 = x;
     *y1 = y;
@@ -304,16 +304,16 @@ TGLDEF TGL_MAYBE_UNUSED bool tglNormalizeRect(int64_t x, int64_t y, int64_t w, i
     if (*y1 > *y2) TGL_SWAP(int64_t, *y1, *y2);
 
     // Cull out invisible rectangle
-    if (*x1 >= canvas_width) return false;
+    if (*x1 >= canvasWidth) return false;
     if (*x2 < 0) return false;
-    if (*y1 >= canvas_height) return false;
+    if (*y1 >= canvasHeight) return false;
     if (*y2 < 0) return false;
 
     // Clamp the rectangle to the boundaries
     if (*x1 < 0) *x1 = 0;
-    if (*x2 >= canvas_width) *x2 = canvas_width - 1;
+    if (*x2 >= canvasWidth) *x2 = canvasWidth - 1;
     if (*y1 < 0) *y1 = 0;
-    if (*y2 >= canvas_height) *y2 = canvas_height - 1;
+    if (*y2 >= canvasHeight) *y2 = canvasHeight - 1;
 
     return true;
 }
@@ -344,8 +344,8 @@ TGLDEF TGL_MAYBE_UNUSED void tglRender(tglCanvas canvas) {
     for (; y < canvas.height - 1; y++) {
         for (int64_t x = 0; x < canvas.width; x++) {
             tglTermPixel pixel = TGL_GET_PIXEL(canvas, x, y);
-            printf(ESC"[48;2;%d;%d;%dm", pixel.background_color.r, pixel.background_color.g, pixel.background_color.b);
-            printf(ESC"[38;2;%d;%d;%dm", pixel.foreground_color.r, pixel.foreground_color.g, pixel.foreground_color.b);
+            printf(ESC"[48;2;%d;%d;%dm", pixel.backgroundColor.r, pixel.backgroundColor.g, pixel.backgroundColor.b);
+            printf(ESC"[38;2;%d;%d;%dm", pixel.foregroundColor.r, pixel.foregroundColor.g, pixel.foregroundColor.b);
             putchar(pixel.value);
         }
         fputs("\n", stdout);
@@ -353,8 +353,8 @@ TGLDEF TGL_MAYBE_UNUSED void tglRender(tglCanvas canvas) {
 
     for (int64_t x = 0; x < canvas.width; x++) {
         tglTermPixel pixel = TGL_GET_PIXEL(canvas, x, y);
-        printf(ESC"[48;2;%d;%d;%dm", pixel.background_color.r, pixel.background_color.g, pixel.background_color.b);
-        printf(ESC"[38;2;%d;%d;%dm", pixel.foreground_color.r, pixel.foreground_color.g, pixel.foreground_color.b);
+        printf(ESC"[48;2;%d;%d;%dm", pixel.backgroundColor.r, pixel.backgroundColor.g, pixel.backgroundColor.b);
+        printf(ESC"[38;2;%d;%d;%dm", pixel.foregroundColor.r, pixel.foregroundColor.g, pixel.foregroundColor.b);
         putchar(pixel.value);
     }
     fputs(ESC"[0m", stdout);

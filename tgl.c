@@ -8,8 +8,8 @@
 
 #define WIDTH 200
 #define HEIGHT 100
-#define DEAD (tglTermPixel) {.value=' ',.foreground_color={.value=0},.background_color={.value=0}}
-#define ALIVE (tgl__term_pixel_t) {.value=' ',.foreground_color={.value=0},.background_color={.value=0xFFFFFFFF}}
+#define DEAD (tglTermPixel) {.value=' ',.foregroundColor={.value=0},.backgroundColor={.value=0}}
+#define ALIVE (tgl__term_pixel_t) {.value=' ',.foregroundColor={.value=0},.backgroundColor={.value=0xFFFFFFFF}}
 
 typedef bool(*rule_check_t)(bool **, size_t, size_t, size_t, size_t);
 
@@ -36,7 +36,7 @@ int main() {
         tglRender(canvas);
         usleep(1000000 / 60);
     }
-    tgl__show_cursor();
+    tglShowCursor();
     return EXIT_SUCCESS;
 }
 
