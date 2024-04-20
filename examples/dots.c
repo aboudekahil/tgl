@@ -6,7 +6,7 @@
 
 #define WIDTH 200
 #define HEIGHT 100
-#define BACKGROUND_PIXEL (tglTermPixel) {.value=' ',.foregroundColor={.value=0},.backgroundColor={.value=0}}
+#define BACKGROUND_PIXEL (tglTermPixel) {.value=' ',.foregroundColor={.value=0xFF000000},.backgroundColor={.value=0xFF000000}}
 #define GRID_COUNT 5
 #define GRID_PAD (0.5f/GRID_COUNT)
 #define GRID_SIZE ((GRID_COUNT - 1)*GRID_PAD)
@@ -58,7 +58,6 @@ void render(tglCanvas canvas) {
         }
     }
 
-    tglRender(canvas);
 }
 
 void update(float dt, bool *isRunning) {

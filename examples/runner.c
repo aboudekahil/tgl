@@ -8,7 +8,7 @@ void setup(tglCanvas canvas);
 void render(tglCanvas canvas);
 void update(float dt, bool* isRunning);
 
-#include "dots.c"
+#include "./transparency.c"
 
 #ifndef WIDTH
 #define WIDTH 0
@@ -22,7 +22,7 @@ void update(float dt, bool* isRunning);
 #define MS_PER_FRAME (1000 / TARGET_FPS)
 
 #ifndef BACKGROUND_PIXEL
-#define BACKGROUND_PIXEL (tglTermPixel) {.value=' ',.foregroundColor={.value=0},.backgroundColor={.value=0}}
+#define BACKGROUND_PIXEL (tglTermPixel) {.value=' ',.foregroundColor={.value=0xff000000},.backgroundColor={.value=0xff000000}}
 #endif
 
 uint64_t getCurrentTimeMillis() {
@@ -61,6 +61,7 @@ int main() {
         render(canvas);
         update(deltaTime, &isRunning);
 
+        tglRender(canvas);
         uint64_t frameTime = getCurrentTimeMillis() - currentTime;
         if (frameTime < MS_PER_FRAME) {
             // Sleep to maintain consistent frame rate

@@ -24,6 +24,61 @@ extern "C" {
 #endif
 #endif
 
+#ifndef TGL_SET_PIXEL
+#define TGL_SET_PIXEL(canvas, x, y, pixel) \
+do {                                       \
+TGL_GET_PIXEL(canvas, x, y).value = pixel.value; \
+TGL_GET_PIXEL(canvas, x, y).backgroundColor.value = tglMixColors(pixel.backgroundColor.value, \
+TGL_GET_PIXEL(canvas, x, y).backgroundColor.value); \
+TGL_GET_PIXEL(canvas, x, y).foregroundColor.value = tglMixColors(pixel.foregroundColor.value, \
+TGL_GET_PIXEL(canvas, x, y).foregroundColor.value); \
+}while(0)
+#endif
+
+#if __BYTE_ORDER__ == __ORDER_BIG_ENDIAN__
+#ifndef TGL_EXTRACT_RED
+#define TGL_EXTRACT_RED(color) (((color)&0x000000FF)>>(8*0))
+#endif
+
+#ifndef TGL_EXTRACT_GREEN
+#define TGL_EXTRACT_GREEN(color) (((color)&0x0000FF00)>>(8*1))
+#endif
+
+#ifndef TGL_EXTRACT_BLUE
+#define TGL_EXTRACT_BLUE(color) (((color)&0x00FF0000)>>(8*2))
+#endif
+
+#ifndef TGL_EXTRACT_ALPHA
+#define TGL_EXTRACT_ALPHA(color) (((color)&0xFF000000)>>(8*3))
+#endif
+
+#ifndef TGL_RGBA_TO_COLOR
+#define TGL_RGBA_TO_COLOR(r, g, b, a) (r, g, b, a) ((((r)&0xFF)<<(8*0)) | (((g)&0xFF)<<(8*1)) | (((b)&0xFF)<<(8*2)) | (((a)&0xFF)<<(8*3)))
+#endif
+#else
+
+#ifndef TGL_EXTRACT_RED
+#define TGL_EXTRACT_RED(color) (((color)&0x00FF0000)>>(8*2))
+#endif
+
+#ifndef TGL_EXTRACT_GREEN
+#define TGL_EXTRACT_GREEN(color) (((color)&0x0000FF00)>>(8*1))
+#endif
+
+#ifndef TGL_EXTRACT_BLUE
+#define TGL_EXTRACT_BLUE(color) (((color)&0x000000FF)>>(8*0))
+#endif
+
+#ifndef TGL_EXTRACT_ALPHA
+#define TGL_EXTRACT_ALPHA(color) (((color)&0xFF000000)>>(8*3))
+#endif
+
+#ifndef TGL_RGBA_TO_COLOR
+#define TGL_RGBA_TO_COLOR(r, g, b, a) ((((r)&0xFF)<<(8*2)) | (((g)&0xFF)<<(8*1)) | (((b)&0xFF)<<(8*0)) | (((a)&0xFF)<<(8*3)))
+#endif
+
+#endif
+
 // Platform-specific includes and definitions ------------------------------------------
 #if defined(__unix__) || defined(__unix) || defined(__linux) || \
     defined(__linux__) && !defined(OS_LINUX)
@@ -158,6 +213,8 @@ tglFillRect(tglCanvas canvas, int64_t x, int64_t y, int64_t w, int64_t h, tglTer
 
 TGLDEF TGL_MAYBE_UNUSED void
 tglFillEllipse(tglCanvas canvas, int64_t x, int64_t y, int64_t r1, int64_t r2, tglTermPixel pixel);
+
+TGLDEF TGL_MAYBE_UNUSED uint32_t tglMixColors(uint32_t color1, uint32_t color2);
 
 
 // CPP EXTERN END ----------------------------------------------------------------------
@@ -333,7 +390,7 @@ tglMakeSubcanvas(tglCanvas canvas, int64_t x, int64_t y, int64_t width, int64_t 
 TGLDEF TGL_MAYBE_UNUSED void tglFillCanvas(tglCanvas canvas, tglTermPixel pixel) {
     for (int64_t y = 0; y < canvas.height; y++) {
         for (int64_t x = 0; x < canvas.width; x++) {
-            TGL_GET_PIXEL(canvas, x, y) = pixel;
+            TGL_SET_PIXEL(canvas, x, y, pixel);
         }
     }
 }
@@ -369,7 +426,7 @@ tglFillRect(tglCanvas canvas, int64_t x, int64_t y, int64_t w, int64_t h, tglTer
 
     for (int64_t ix = x1; ix <= x2; ix++) {
         for (int64_t iy = y1; iy <= y2; iy++) {
-            TGL_GET_PIXEL(canvas, ix, iy) = pixel;
+            TGL_SET_PIXEL(canvas, ix, iy, pixel);
         }
     }
 }
@@ -381,7 +438,7 @@ tglDrawLine(tglCanvas canvas, int64_t x1, int64_t y1, int64_t x2, int64_t y2, tg
 
     if (dx == 0 && dy == 0) {
         if (tglIsInbounds(canvas, x1, y1)) {
-            TGL_GET_PIXEL(canvas, x1, y1) = pixel;
+            TGL_SET_PIXEL(canvas, x1, y1, pixel);
         }
         return;
     }
@@ -395,7 +452,7 @@ tglDrawLine(tglCanvas canvas, int64_t x1, int64_t y1, int64_t x2, int64_t y2, tg
         for (int64_t x = x1; x <= x2; x++) {
             int64_t y = dy * (x - x1) / dx + y1;
             if (tglIsInbounds(canvas, x, y)) {
-                TGL_GET_PIXEL(canvas, x, y) = pixel;
+                TGL_SET_PIXEL(canvas, x, y, pixel);
             }
         }
     } else {
@@ -407,7 +464,7 @@ tglDrawLine(tglCanvas canvas, int64_t x1, int64_t y1, int64_t x2, int64_t y2, tg
         for (int64_t y = y1; y <= y2; ++y) {
             int64_t x = dx * (y - y1) / dy + x1;
             if (tglIsInbounds(canvas, x, y)) {
-                TGL_GET_PIXEL(canvas, x, y) = pixel;
+                TGL_SET_PIXEL(canvas, x, y, pixel);
             }
         }
     }
@@ -428,8 +485,8 @@ tglDrawEllipse(tglCanvas canvas, int64_t x, int64_t y, int64_t r1, int64_t r2, t
     int64_t ix = x, iy = y;
     int64_t ir1 = r1, ir2 = r2;
 
-    TGL_GET_PIXEL(canvas, ix, y + r2) = pixel;
-    TGL_GET_PIXEL(canvas, ix, y - r2) = pixel;
+    TGL_SET_PIXEL(canvas, ix, y + r2, pixel);
+    TGL_SET_PIXEL(canvas, ix, y - r2, pixel);
 
     wx = 0;
     wy = ir2;
@@ -452,15 +509,13 @@ tglDrawEllipse(tglCanvas canvas, int64_t x, int64_t y, int64_t r1, int64_t r2, t
         if (xa >= ya)
             break;
 
-
-        TGL_GET_PIXEL(canvas, ix + wx, iy - wy) = pixel;
-        TGL_GET_PIXEL(canvas, ix - wx, iy - wy) = pixel;
-        TGL_GET_PIXEL(canvas, ix + wx, iy + wy) = pixel;
-        TGL_GET_PIXEL(canvas, ix - wx, iy + wy) = pixel;
+        TGL_SET_PIXEL(canvas, ix + wx, iy - wy, pixel);
+        TGL_SET_PIXEL(canvas, ix - wx, iy - wy, pixel);
+        TGL_SET_PIXEL(canvas, ix + wx, iy + wy, pixel);
+        TGL_SET_PIXEL(canvas, ix - wx, iy + wy, pixel);
     }
-
-    TGL_GET_PIXEL(canvas, (x + r1), iy) = pixel;
-    TGL_GET_PIXEL(canvas, (x - r1), iy) = pixel;
+    TGL_SET_PIXEL(canvas, x + r1, iy, pixel);
+    TGL_SET_PIXEL(canvas, x - r1, iy, pixel);
 
     wx = ir1;
     wy = 0;
@@ -484,42 +539,51 @@ tglDrawEllipse(tglCanvas canvas, int64_t x, int64_t y, int64_t r1, int64_t r2, t
         if (ya > xa)
             break;
 
-        TGL_GET_PIXEL(canvas, ix + wx, iy - wy) = pixel;
-        TGL_GET_PIXEL(canvas, ix - wx, iy - wy) = pixel;
-        TGL_GET_PIXEL(canvas, ix + wx, iy + wy) = pixel;
-        TGL_GET_PIXEL(canvas, ix - wx, iy + wy) = pixel;
+        TGL_SET_PIXEL(canvas, ix + wx, iy - wy, pixel);
+        TGL_SET_PIXEL(canvas, ix - wx, iy - wy, pixel);
+        TGL_SET_PIXEL(canvas, ix + wx, iy + wy, pixel);
+        TGL_SET_PIXEL(canvas, ix - wx, iy + wy, pixel);
     }
 }
 
 TGLDEF TGL_MAYBE_UNUSED void
-tglDrawRect(tglCanvas canvas, int64_t x, int64_t y, int64_t w, int64_t h, tglTermPixel pixel) {
+tglDrawRect(tglCanvas canvas, int64_t x, int64_t y,
+            int64_t w, int64_t h,
+            tglTermPixel pixel) {
     int64_t x1, x2, y1, y2;
 
-    if (!tglNormalizeRect(x, y, w, h, canvas.width, canvas.height, &x1, &x2, &y1, &y2))
+    if (!tglNormalizeRect(x, y, w, h, canvas.width,
+                          canvas.height, &x1, &x2,
+                          &y1, &y2))
         return;
 
     for (int64_t i = x1; i <= x2; i++) {
-        TGL_GET_PIXEL(canvas, i, y1) = pixel;
+        TGL_SET_PIXEL(canvas, i, y1, pixel);
     }
 
     for (int64_t i = x1; i <= x2; i++) {
-        TGL_GET_PIXEL(canvas, i, y2) = pixel;
+        TGL_SET_PIXEL(canvas, i, y2, pixel);
     }
 
     for (int64_t i = y1; i <= y2; i++) {
-        TGL_GET_PIXEL(canvas, x1, i) = pixel;
+        TGL_SET_PIXEL(canvas, x1, i, pixel);
     }
 
     for (int64_t i = y1; i <= y2; i++) {
-        TGL_GET_PIXEL(canvas, x2, i) = pixel;
+        TGL_SET_PIXEL(canvas, x2, i, pixel);
     }
 }
 
 TGLDEF TGL_MAYBE_UNUSED void
-tglFillEllipse(tglCanvas canvas, int64_t x, int64_t y, int64_t r1, int64_t r2, tglTermPixel pixel) {
-    int64_t x1 = x - r1, x2 = x + r1, y1 = y - r2, y2 = y + r2;
+tglFillEllipse(tglCanvas canvas, int64_t x,
+               int64_t y, int64_t r1, int64_t r2,
+               tglTermPixel pixel) {
+    int64_t x1 = x - r1, x2 = x + r1, y1 =
+            y - r2, y2 = y + r2;
 
-    if (x1 > canvas.width || y1 > canvas.height || x2 < 0 || y2 < 0) return;
+    if (x1 > canvas.width || y1 > canvas.height ||
+        x2 < 0 || y2 < 0)
+        return;
 
     int64_t width = x2 - x1;
     int64_t height = y2 - y1;
@@ -533,35 +597,76 @@ tglFillEllipse(tglCanvas canvas, int64_t x, int64_t y, int64_t r1, int64_t r2, t
     // do the horizontal diameter
     for (int64_t ix = -width; ix <= width; ix++) {
         if (TGL_IN_BOUNDS(canvas, x + ix, y)) {
-            TGL_GET_PIXEL(canvas, x + ix, y) = pixel;
+            TGL_SET_PIXEL(canvas, x + ix,
+                          y, pixel);
         }
     }
 
     // now do both halves at the same time, away from the diameter
     for (int64_t iy = 1; iy <= height; iy++) {
-        int64_t sx1 = x0 - (dx - 1);  // try slopes of dx - 1 or more
+        int64_t sx1 = x0 - (dx -
+                            1);  // try slopes of dx - 1 or more
         for (; sx1 > 0; sx1--) {
-            if (sx1 * sx1 * hh + iy * iy * ww <= hhww) {
+            if (sx1 * sx1 * hh + iy * iy * ww <=
+                hhww) {
                 break;
             }
         }
-        dx = x0 - sx1;  // current approximation of the slope
+        dx = x0 -
+             sx1;  // current approximation of the slope
         x0 = sx1;
 
         for (int64_t ix = -x0; ix <= x0; ix++) {
             // TODO: REFACTOR TO GET x + ix not checked twice
-            if (TGL_IN_BOUNDS(canvas, x + ix, y - iy)) TGL_GET_PIXEL(canvas, x + ix, y - iy) = pixel;
-            if (TGL_IN_BOUNDS(canvas, x + ix, y + iy)) TGL_GET_PIXEL(canvas, x + ix, y + iy) = pixel;
+            if (TGL_IN_BOUNDS(canvas, x + ix,
+                              y - iy)) {
+                TGL_SET_PIXEL(canvas, x + ix,
+                              y - iy, pixel);
+            }
+
+            if (TGL_IN_BOUNDS(canvas,
+                              x + ix,
+                              y + iy)) {
+                TGL_SET_PIXEL(canvas,
+                              x + ix,
+                              y + iy,
+                              pixel);
+            }
         }
     }
 }
 
-TGLDEF TGL_MAYBE_UNUSED void tglDrawPixel(tglCanvas canvas, int64_t x, int64_t y, tglTermPixel pixel) {
+TGLDEF TGL_MAYBE_UNUSED void
+tglDrawPixel(tglCanvas canvas, int64_t x,
+             int64_t y,
+             tglTermPixel pixel) {
     if (TGL_IN_BOUNDS(canvas, x, y)) {
-        TGL_GET_PIXEL(canvas, x, y) = pixel;
+        TGL_SET_PIXEL(canvas, x, y, pixel);
     }
 }
 
+TGLDEF TGL_MAYBE_UNUSED uint32_t tglMixColors(uint32_t color1, uint32_t color2) {
+    uint32_t r1 = TGL_EXTRACT_RED(color1);
+    uint32_t g1 = TGL_EXTRACT_GREEN(color1);
+    uint32_t b1 = TGL_EXTRACT_BLUE(color1);
+    uint32_t a1 = TGL_EXTRACT_ALPHA(color1);
+
+    if (a1 == 0xFF) return color1;
+
+    uint32_t r2 = TGL_EXTRACT_RED(color2);
+    uint32_t g2 = TGL_EXTRACT_GREEN(color2);
+    uint32_t b2 = TGL_EXTRACT_BLUE(color2);
+    uint32_t a2 = TGL_EXTRACT_ALPHA(color2);
+
+    r1 = (r1 * a1 + r2 * a2) / 255;
+    if (r1 > 255) r1 = 255;
+    g1 = (g1 * a1 + g2 * a2) / 255;
+    if (g1 > 255) g1 = 255;
+    b1 = (b1 * a1 + b2 * a2) / 255;
+    if (b1 > 255) b1 = 255;
+
+    return TGL_RGBA_TO_COLOR(r1, g1, b1, a1);
+}
 
 #endif
 
@@ -570,6 +675,7 @@ TGLDEF TGL_MAYBE_UNUSED void tglDrawPixel(tglCanvas canvas, int64_t x, int64_t y
 #undef OS_WINDOWS
 #undef TGLDEF
 #undef ESC
+#undef TGL_SET_PIXEL
 
 #endif
 

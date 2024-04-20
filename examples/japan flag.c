@@ -1,6 +1,3 @@
-#define TGL_IMPLEMENTATION
-#include "../headers/tgl.h"
-
 #define BACKGROUND_PIXEL (tglTermPixel) {.value=' ', .foregroundColor={.value=0x00000000}, .backgroundColor={.value=0x00000000}}
 #define WHITE (tglTermPixel) {.value=' ', .foregroundColor={.value=0x00000000}, .backgroundColor={.value=0xFFFFFFFF}}
 #define RED (tglTermPixel) {.value=' ', .foregroundColor={.value=0x00000000}, .backgroundColor={.value=0xFFFF0000}}
@@ -18,7 +15,6 @@ void render(tglCanvas canvas) {
     tglFillRect(canvas, 0, 0, WIDTH, HEIGHT, WHITE);
     tglFillEllipse(canvas, WIDTH/2, HEIGHT/2, HEIGHT / 3, HEIGHT / 6, RED);
 
-    tglRender(canvas);
 }
 
 void update(float dt, bool* isRunning) {

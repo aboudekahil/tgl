@@ -41,7 +41,6 @@ void render(tglCanvas canvas) {
             tglDrawPixel(canvas, x, (HEIGHT - y) + (rand() % 50), YELLOW_PIXEL);
         }
     }
-    tglRender(canvas);
 }
 
 void update(float dt, bool* isRunning) {
