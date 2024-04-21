@@ -55,7 +55,7 @@ int main() {
 
     while (isRunning) {
         currentTime = getCurrentTimeMillis();
-        deltaTime = (float) (currentTime - lastTime) / 1000.0f;
+        deltaTime = (float) (currentTime - lastTime) / 1000.0F;
         lastTime = currentTime;
 
         render(canvas);
