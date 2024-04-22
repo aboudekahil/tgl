@@ -8,7 +8,7 @@ void setup(tglCanvas canvas);
 void render(tglCanvas canvas);
 void update(float dt, bool* isRunning);
 
-#include "./transparency.c"
+#include "./triangle transparency.c"
 
 #ifndef WIDTH
 #define WIDTH 0

@@ -84,6 +84,14 @@ extern "C" {
 #define TGLAPI TGLDEF __attribute_maybe_unused__
 #endif
 
+#ifndef TGL_MIN
+#define TGL_MIN(a, b) (a <= b ? a : b)
+#endif
+
+#ifndef TGL_MAX
+#define TGL_MAX(a, b) (a >= b ? a : b)
+#endif
+
 // Platform-specific includes and definitions
 // ------------------------------------------
 #if defined(__unix__) || defined(__unix) || defined(__linux) || \
@@ -267,6 +275,21 @@ TGLAPI void tglDrawRect(tglCanvas canvas, int64_t x, int64_t y, int64_t w,
 TGLAPI void tglDrawEllipse(tglCanvas canvas, int64_t x, int64_t y, int64_t r1,
                            int64_t r2, tglTermPixel pixel);
 
+/**
+ * @brief Draws an outline of a triangle on a canvas.
+ *
+ * @param canvas The canvas to draw the triangle on.
+ * @param x1 The x-coordinate of the first vertex.
+ * @param y1 The y-coordinate of the first vertex.
+ * @param x2 The x-coordinate of the second vertex.
+ * @param y2 The y-coordinate of the second vertex.
+ * @param x3 The x-coordinate of the third vertex.
+ * @param y3 The y-coordinate of the third vertex.
+ * @param pixel The pixel value to render the triangle.
+ */
+TGLAPI void tglDrawTriangle(tglCanvas canvas, int64_t x1, int64_t y1, int64_t x2, int64_t y2, int64_t x3, int64_t y3,
+                            tglTermPixel pixel);
+
 // Fill drawing functions
 // -------------------------------------------------------------------------
 
@@ -302,6 +325,22 @@ TGLAPI void tglFillRect(tglCanvas canvas, int64_t x, int64_t y, int64_t w,
  */
 TGLAPI void tglFillEllipse(tglCanvas canvas, int64_t x, int64_t y, int64_t r1,
                            int64_t r2, tglTermPixel pixel);
+
+/**
+ * @brief Draws a filled triangle on a canvas.
+ *
+ * @param canvas The canvas to draw the triangle on.
+ * @param x1 The x-coordinate of the first vertex.
+ * @param y1 The y-coordinate of the first vertex.
+ * @param x2 The x-coordinate of the second vertex.
+ * @param y2 The y-coordinate of the second vertex.
+ * @param x3 The x-coordinate of the third vertex.
+ * @param y3 The y-coordinate of the third vertex.
+ * @param pixel The pixel value to render the triangle.
+ */
+TGLAPI void tglFillTriangle(tglCanvas canvas, int64_t x1, int64_t y1,
+                            int64_t x2, int64_t y2, int64_t x3, int64_t y3,
+                            tglTermPixel pixel);
 
 // Useful utility functions
 // -------------------------------------------------------------------------
@@ -868,6 +907,47 @@ TGLAPI uint32_t tglMixColors(uint32_t color1, uint32_t color2) {
     return TGL_RGBA_TO_COLOR(r1, g1, b1, a1);
 }
 
+
+TGLAPI void tglFillTriangle(tglCanvas canvas, int64_t x1, int64_t y1,
+                            int64_t x2, int64_t y2, int64_t x3, int64_t y3,
+                            tglTermPixel pixel) {
+    // Bounding box of the triangle
+    int64_t minX = TGL_MIN(x1, TGL_MIN(x2, x3));
+    int64_t maxX = TGL_MAX(x1, TGL_MAX(x2, x3));
+    int64_t minY = TGL_MIN(y1, TGL_MIN(y2, y3));
+    int64_t maxY = TGL_MAX(y1, TGL_MAX(y2, y3));
+
+    // Barycentric coordinates
+    int64_t dx12 = x1 - x2;
+    int64_t dx23 = x2 - x3;
+    int64_t dx31 = x3 - x1;
+    int64_t dy12 = y1 - y2;
+    int64_t dy23 = y2 - y3;
+    int64_t dy31 = y3 - y1;
+    int64_t det = dx12 * dy31 - dx31 * dy12;
+    int64_t minD = det < 0 ? -1 : 1;
+
+    for (int64_t y = minY; y <= maxY; y++) {
+        for (int64_t x = minX; x <= maxX; x++) {
+            // Barycentric weights
+            int64_t w1 = (dx23 * (y - y3) - dy23 * (x - x3)) * minD;
+            int64_t w2 = (dx31 * (y - y1) - dy31 * (x - x1)) * minD;
+            int64_t w3 = det - w1 - w2;
+            if (w1 >= 0 && w2 >= 0 && w3 >= 0) {
+                TGL_SET_PIXEL(canvas, x, y, pixel);
+            }
+        }
+    }
+}
+
+TGLAPI void tglDrawTriangle(tglCanvas canvas, int64_t x1, int64_t y1, int64_t x2, int64_t y2, int64_t x3, int64_t y3,
+                            tglTermPixel pixel) {
+    tglDrawLine(canvas, x1, y1, x2, y2, pixel);
+    tglDrawLine(canvas, x1, y1, x3, y3, pixel);
+    tglDrawLine(canvas, x2, y2, x3, y3, pixel);
+}
+
+
 #endif
 
 // UNDEF INTERNAL MACROS
@@ -877,6 +957,9 @@ TGLAPI uint32_t tglMixColors(uint32_t color1, uint32_t color2) {
 #undef TGLDEF
 #undef ESC
 #undef TGL_SET_PIXEL
+#undef TGL_GET_PIXEL
+#undef TGL_MAX
+#undef TGL_MIN
 
 #endif
 
