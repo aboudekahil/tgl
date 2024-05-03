@@ -18,6 +18,6 @@ void render(tglCanvas canvas) {
 }
 
 void update(float dt, bool* isRunning) {
-    if(i++ > 1000) *isRunning = false;
+    if(i++ > 10) *isRunning = false;
 }
 

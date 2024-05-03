@@ -450,13 +450,13 @@ TGLAPI bool tglSupportsColor(void) {
             "linux", "msys", "putty", "rxvt", "screen", "vt100", "xterm"};
 
     const char *envP = getenv("TERM");
-    if (envP == nullptr) {
+    if (envP == NULL) {
         return false;
     }
 
     for (uint8_t i = 0;
          i < (uint8_t) (sizeof(supportedTerms) / sizeof(supportedTerms[0])); i++) {
-        if (strstr(envP, supportedTerms[i]) != nullptr) {
+        if (strstr(envP, supportedTerms[i]) != NULL) {
             return true;
         }
     }
@@ -934,7 +934,7 @@ TGLAPI void tglFillTriangle(tglCanvas canvas, int64_t x1, int64_t y1,
             int64_t w2 = (dx31 * (y - y1) - dy31 * (x - x1)) * minD;
             int64_t w3 = det - w1 - w2;
             if (w1 >= 0 && w2 >= 0 && w3 >= 0) {
-                TGL_SET_PIXEL(canvas, x, y, pixel);
+                if (TGL_IN_BOUNDS(canvas, x, y)) { TGL_SET_PIXEL(canvas, x, y, pixel); }
             }
         }
     }
