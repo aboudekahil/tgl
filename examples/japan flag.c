@@ -7,7 +7,8 @@
 
 static int i = 0;
 
-void setup(tglCanvas canvas) {}
+void setup(tglCanvas canvas) {
+}
 
 void render(tglCanvas canvas) {
     tglFillCanvas(canvas, BACKGROUND_PIXEL);

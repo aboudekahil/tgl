@@ -1,109 +1,67 @@
-#include <stdlib.h>
 #include <math.h>
 
 #define BACKGROUND_PIXEL (tglTermPixel) {.value=' ', .foregroundColor={.value=0x00000000}, .backgroundColor={.value=0x00000000}}
-#define WHITE (tglTermPixel) {.value=' ', .foregroundColor={.value=0x00000000}, .backgroundColor={.value=0xFFFFFFFF}}
-#define RED (tglTermPixel) {.value=' ', .foregroundColor={.value=0x00000000}, .backgroundColor={.value=0xFFFF0000}}
+#define WIDTH 60
+#define HEIGHT 40
 
-#define WIDTH 400
-#define HEIGHT 100
-#define PARTICLE_COUNT_X 20
-#define PARTICLE_COUNT_Y 10
-#define PARTICLE_SPACING 20
-#define STIFFNESS 0.28
-#define DAMPING 0.1
-#define GRAVITY 0.1
-#define TIME_STEP 0.5
-#define WIND 0.05
+static int i = 0;
+#define PI 3.14159265359
+static char luminanceChars[] = ".,-~:;=!*#$@";
 
-typedef struct {
-    float x, y;
-    float vx, vy;  // velocities
-    bool fixed;
-} Particle;
-
-Particle particles[PARTICLE_COUNT_X * PARTICLE_COUNT_Y];
-
-void setupParticles() {
-    for (int y = 0; y < PARTICLE_COUNT_Y; ++y) {
-        for (int x = 0; x < PARTICLE_COUNT_X; ++x) {
-            int index = y * PARTICLE_COUNT_X + x;
-            particles[index].x = x * PARTICLE_SPACING;
-            particles[index].y = y * PARTICLE_SPACING;
-            particles[index].vx = 0;
-            particles[index].vy = 0;
-            particles[index].fixed = (y == 0); // fix the top row of particles
-        }
-    }
-}
-
-void updateParticlePhysics(float dt) {
-    for (int i = 0; i < PARTICLE_COUNT_X * PARTICLE_COUNT_Y; ++i) {
-        if (!particles[i].fixed) {
-            particles[i].vx += WIND;
-            particles[i].vy += GRAVITY * dt;
-            float newX = particles[i].x + particles[i].vx * dt;
-            float newY = particles[i].y + particles[i].vy * dt;
-            particles[i].vx *= (1 - DAMPING);
-            particles[i].vy *= (1 - DAMPING);
-            particles[i].x = newX;
-            particles[i].y = newY;
-        }
-    }
-}
-
-void applyConstraints() {
-    for (int y = 0; y < PARTICLE_COUNT_Y; ++y) {
-        for (int x = 0; x < PARTICLE_COUNT_X; ++x) {
-            int index = y * PARTICLE_COUNT_X + x;
-            if (x > 0) { // Horizontal spring
-                int left = index - 1;
-                float dx = particles[index].x - particles[left].x;
-                float dy = particles[index].y - particles[left].y;
-                float distance = sqrt(dx * dx + dy * dy);
-                float diff = (distance - PARTICLE_SPACING) / distance;
-                if (!particles[left].fixed) {
-                    particles[left].x += dx * STIFFNESS * diff;
-                    particles[left].y += dy * STIFFNESS * diff;
-                }
-                if (!particles[index].fixed) {
-                    particles[index].x -= dx * STIFFNESS * diff;
-                    particles[index].y -= dy * STIFFNESS * diff;
-                }
-            }
-            if (y > 0) { // Vertical spring
-                int above = index - PARTICLE_COUNT_X;
-                float dx = particles[index].x - particles[above].x;
-                float dy = particles[index].y - particles[above].y;
-                float distance = sqrt(dx * dx + dy * dy);
-                float diff = (distance - PARTICLE_SPACING) / distance;
-                if (!particles[above].fixed) {
-                    particles[above].x += dx * STIFFNESS * diff;
-                    particles[above].y += dy * STIFFNESS * diff;
-                }
-                if (!particles[index].fixed) {
-                    particles[index].x -= dx * STIFFNESS * diff;
-                    particles[index].y -= dy * STIFFNESS * diff;
-                }
-            }
-        }
-    }
-}
 
 void setup(tglCanvas canvas) {
-    setupParticles();
+    tglFillCanvas(canvas, BACKGROUND_PIXEL);
 }
 
 void render(tglCanvas canvas) {
+    // Define the characters for shading based on luminance
+
+    // Clear the canvas
     tglFillCanvas(canvas, BACKGROUND_PIXEL);
-    for (int i = 0; i < PARTICLE_COUNT_X * PARTICLE_COUNT_Y; ++i) {
-        tglDrawPixel(canvas, (int) particles[i].x, (int) particles[i].y, RED);
+
+    // Torus parameters
+    double A = i * 0.04;
+    double B = i * 0.02;
+    double cosA = cos(A), sinA = sin(A);
+    double cosB = cos(B), sinB = sin(B);
+    double R1 = 1, R2 = 2;
+    double K2 = 5, K1 = 20;
+
+    // Loop over theta and phi
+    for (double theta = 0; theta < 2 * PI; theta += 0.07) {
+        double costheta = cos(theta), sintheta = sin(theta);
+        for (double phi = 0; phi < 2 * PI; phi += 0.02) {
+            double cosphi = cos(phi), sinphi = sin(phi);
+            double circlex = R2 + R1 * costheta;
+            double circley = R1 * sintheta;
+
+            // 3D coordinates after rotation
+            double x = circlex * (cosB * cosphi + sinA * sinB * sinphi) - circley * cosA * sinB;
+            double y = circlex * (sinB * cosphi - sinA * cosB * sinphi) + circley * cosA * cosB;
+            double z = K2 + cosA * circlex * sinphi + circley * sinA;
+            double ooz = 1 / z;
+            int xp = (int) (WIDTH / 2 + K1 * ooz * x);
+            int yp = (int) (HEIGHT / 2 - K1 * ooz * y);
+
+            // Luminance
+            double L = cosphi * costheta * sinB - cosA * costheta * sinphi - sinA * sintheta +
+                       cosB * (cosA * sintheta - costheta * sinphi);
+            if (L > 0) {
+                int luminanceIndex = (int) (L * 8);
+                char ch = luminanceChars[luminanceIndex];
+                tglTermPixel pixel = {
+                        .value = ch,
+                        .foregroundColor = {.r=255, .g=255, .b=255, .a=255},
+                        .backgroundColor = {.r=0, .g=0, .b=0, .a=255}
+                };
+                tglDrawPixel(canvas, xp, yp, pixel);
+            }
+        }
     }
 }
 
 void update(float dt, bool *isRunning) {
-    updateParticlePhysics(dt);
-    applyConstraints();
-    static int frameCount = 0;
-    if (++frameCount > 200) *isRunning = false;
+    if (i++ > 10) {
+        *isRunning = false;
+    }
 }

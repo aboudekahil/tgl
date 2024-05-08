@@ -188,6 +188,10 @@ typedef struct {
     tglTermPixel *pixels;
 } tglCanvas;
 
+typedef struct {
+    int64_t x, y;
+} tglVertex;
+
 // FUNCTION DEFINITIONS
 // -------------------------------------------------------------------------
 
@@ -341,6 +345,9 @@ TGLAPI void tglFillEllipse(tglCanvas canvas, int64_t x, int64_t y, int64_t r1,
 TGLAPI void tglFillTriangle(tglCanvas canvas, int64_t x1, int64_t y1,
                             int64_t x2, int64_t y2, int64_t x3, int64_t y3,
                             tglTermPixel pixel);
+
+TGLAPI void
+tglFillPolygon(tglCanvas canvas, const int64_t *xCoords, const int64_t *yCoords, int64_t vertexCount, tglTermPixel pixel);
 
 // Useful utility functions
 // -------------------------------------------------------------------------
@@ -805,17 +812,11 @@ TGLAPI void tglDrawRect(tglCanvas canvas, int64_t x, int64_t y, int64_t w,
 
     for (int64_t i = x1; i <= x2; i++) {
         TGL_SET_PIXEL(canvas, i, y1, pixel);
-    }
-
-    for (int64_t i = x1; i <= x2; i++) {
         TGL_SET_PIXEL(canvas, i, y2, pixel);
     }
 
     for (int64_t i = y1; i <= y2; i++) {
         TGL_SET_PIXEL(canvas, x1, i, pixel);
-    }
-
-    for (int64_t i = y1; i <= y2; i++) {
         TGL_SET_PIXEL(canvas, x2, i, pixel);
     }
 }
@@ -945,6 +946,52 @@ TGLAPI void tglDrawTriangle(tglCanvas canvas, int64_t x1, int64_t y1, int64_t x2
     tglDrawLine(canvas, x1, y1, x2, y2, pixel);
     tglDrawLine(canvas, x1, y1, x3, y3, pixel);
     tglDrawLine(canvas, x2, y2, x3, y3, pixel);
+}
+
+TGLAPI void
+tglFillPolygon(tglCanvas canvas, const int64_t *xCoords, const int64_t *yCoords, int64_t vertexCount, tglTermPixel pixel) {
+    int64_t i, j, temp;
+    int64_t xmin = canvas.width - 1, xmax = 0;
+
+    // Find the minimum and maximum x-coordinates of the polygon
+    for (i = 0; i < vertexCount; i++) {
+        if (xCoords[i] < xmin)
+            xmin = xCoords[i];
+        if (xCoords[i] > xmax)
+            xmax = xCoords[i];
+    }
+
+    // Scan each scan-line within the polygon's vertical extent
+    for (i = xmin; i <= xmax; i++) {
+        // Initialize an array to store the intersection points
+        int64_t interPoints[vertexCount], count = 0;
+
+        for (j = 0; j < vertexCount; j++) {
+            int64_t next = (j + 1) % vertexCount;
+
+            // Check if the current edge intersects with the scan line
+            if ((yCoords[j] > i && yCoords[next] <= i) || (yCoords[next] > i && yCoords[j] <= i)) {
+                interPoints[count++] =
+                        xCoords[j] + (i - yCoords[j]) * (xCoords[next] - xCoords[j]) / (yCoords[next] - yCoords[j]);
+            }
+        }
+
+        // Sort the intersection points in ascending order
+        for (j = 0; j < count - 1; j++) {
+            for (int64_t k = 0; k < count - j - 1; k++) {
+                if (interPoints[k] > interPoints[k + 1]) {
+                    temp = interPoints[k];
+                    interPoints[k] = interPoints[k + 1];
+                    interPoints[k + 1] = temp;
+                }
+            }
+        }
+
+        // Fill the pixels between pairs of intersection points
+        for (j = 0; j < count; j += 2) {
+            tglDrawLine(canvas, interPoints[j], i, interPoints[j + 1], i, pixel);
+        }
+    }
 }
 
 
